@@ -110,7 +110,7 @@ install_server() {
     
     log "INFO" "Installing DayZ Dedicated Server..."
     
-    local install_cmd="./steamcmd.sh +force_install_dir \"$HOME\" \"+login \\\"${STEAM_USER}\\\" \\\"${STEAM_PASS}\\\"\" +app_update ${STEAMCMD_APPID:-223350} $( [[ -z ${STEAMCMD_BETAID} ]] || printf %s \"-beta ${STEAMCMD_BETAID}\" ) $( [[ -z ${STEAMCMD_BETAPASS} ]] || printf %s \"-betapassword ${STEAMCMD_BETAPASS}\" ) ${INSTALL_FLAGS:-} validate +quit"
+    local install_cmd="./steamcmd.sh +force_install_dir \"$HOME\" \"+login \\\"${STEAM_USER}\\\" \\\"${STEAM_PASS}\\\"\" +app_update ${STEAMCMD_APPID:-223350} $( [[ -z ${STEAMCMD_BETAID:-} ]] || printf %s \"-beta ${STEAMCMD_BETAID}\" ) $( [[ -z ${STEAMCMD_BETAPASS:-} ]] || printf %s \"-betapassword ${STEAMCMD_BETAPASS}\" ) ${INSTALL_FLAGS:-} validate +quit"
     
     cd "$HOME/steamcmd"
     retry_with_backoff "$install_cmd"
@@ -361,7 +361,7 @@ install_auxiliary_scripts() {
     mkdir -p "$HOME/scripts"
     
     # URL base para scripts (configurable por host)
-    local scripts_base_url="${SCRIPTS_BASE_URL:-https://raw.githubusercontent.com/ptero-eggs/game-eggs/main/dayz/scripts}"
+    local scripts_base_url="${SCRIPTS_BASE_URL:-https://raw.githubusercontent.com/DeMonCraZy170/dayz-scripts/refs/heads/main}"
     
     # Lista de scripts a descargar
     local scripts=(
@@ -407,6 +407,24 @@ install_auxiliary_scripts() {
         log "WARN" "No auxiliary scripts could be downloaded. Server will use basic startup."
         log "WARN" "You can manually copy scripts later or configure SCRIPTS_BASE_URL variable."
     fi
+    
+    # Crear script wrapper permanente para startup command
+    log "INFO" "Creating startup wrapper script..."
+    cat > "$HOME/start-wrapper.sh" << 'EOF'
+#!/bin/bash
+# Startup wrapper script for DayZ Server
+# This script handles fallback logic for server startup
+
+if [ -f /mnt/server/scripts/start-server-enterprise.sh ]; then
+    exec bash /mnt/server/scripts/start-server-enterprise.sh
+elif [ -f /mnt/server/scripts/start-server.sh ]; then
+    exec bash /mnt/server/scripts/start-server.sh
+else
+    exec ./${SERVER_BINARY} -port=${SERVER_PORT} -profiles=profiles -bepath=./ -config=serverDZ.cfg -mod=${CLIENT_MODS} -serverMod=${SERVERMODS} ${STARTUP_PARAMS}
+fi
+EOF
+    chmod +x "$HOME/start-wrapper.sh"
+    log "SUCCESS" "Startup wrapper script created"
 }
 
 # Función principal
